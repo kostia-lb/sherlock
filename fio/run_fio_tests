@@ -1,20 +1,46 @@
 #!/bin/bash
 
-#!/bin/bash
+readonly TAG=${1}  # optional extra label in filename (arg $15 of run_fio_job)
 
-readonly TAG=${1}
-readonly NUMBER_OF_LOOPS=1
+# fio workload options
+readonly blocks_array=(4k 8k 64k 128k 1m)       # (determines arg $3 of run_fio_job)
+readonly write_percs_array=(0)                  # (determines arg $2 of run_fio_job)
+readonly jobs_array=(4)                         # (determines arg $6 of run_fio_job)
+readonly qd_array=(4)                           # (determines arg $7 of run_fio_job)
+readonly NUMBER_OF_LOOPS=1  # mut be at least 1 (or more for extra runs)
+readonly RUNTIME=60         # secs per job (arg $5 of run_fio_job)
 
-for block in 4k 8k 64k 128k 1m
-do
-  for write_perc in 0
-  do
-    for ((x=1;x<=NUMBER_OF_LOOPS;x++))
-    do
-      bash run_fio_job los ${write_perc} ${block} /data 60 4 4 2048g RAW 1 randrw 1 1Gi json ${TAG}-${x}
-      if [[ ${x} != ${NUMBER_OF_LOOPS} ]]; then
-        sleep 60
-      fi
+readonly SDS_NAME=los       # (arg $1 of run_fio_job)
+readonly FNAME=/data        # (arg $4 of run_fio_job)
+readonly WORKSIZE=2048g     # (arg $8 of run_fio_job)
+readonly VOL_MODE=RAW       # (arg $9 of run_fio_job)
+readonly DIRECT_IO=1        # (arg $10 of run_fio_job)
+readonly IO_PATTERN=randrw  # (arg $11 of run_fio_job)
+readonly FIO_POD_CPU=1      # (arg $12 of run_fio_job)
+readonly FIO_POD_MEM=1Gi    # (arg $13 of run_fio_job)
+readonly FIO_OUTPUT=json    # (arg $14 of run_fio_job)
+
+# est total run length: multiply each array length together & multiply by runtime
+# above: 5 * 1 * 1 * 1 * 60 seconds = 300 seconds or 5 min
+
+I=0;
+for block in "${blocks_array[@]}"; do
+  for write_perc in "${write_percs_array[@]}"; do
+    for jobs in "${jobs_array[@]}"; do
+      for qd in "${qd_array[@]}"; do
+        for ((x=1;x<=NUMBER_OF_LOOPS;x++)); do
+          ((I++))
+          echo ""
+          echo "### `date` - Running Job $I ###"
+          echo "# bash run_fio_job ${SDS_NAME} ${write_perc} ${block} ${FNAME} ${RUNTIME} ${jobs} ${qd} ${WORKSIZE} ${VOL_MODE} ${DIRECT_IO} ${IO_PATTERN} ${FIO_POD_CPU} ${FIO_POD_MEM} ${FIO_OUTPUT} ${TAG}-${x}"
+          bash run_fio_job ${SDS_NAME} ${write_perc} ${block} ${FNAME} ${RUNTIME} ${jobs} ${qd} ${WORKSIZE} ${VOL_MODE} ${DIRECT_IO} ${IO_PATTERN} ${FIO_POD_CPU} ${FIO_POD_MEM} ${FIO_OUTPUT} ${TAG}-${x}
+          if [[ ${x} != ${NUMBER_OF_LOOPS} ]]; then
+            sleep 60
+          fi
+        done
+      done
     done
   done
 done
+
+# EOF
